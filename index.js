@@ -449,6 +449,5 @@ run().catch(console.dir);
 app.get('/', async(req,res)=>{
     res.send("yoga class is running")
 })
-app.listen(port,()=>{
-    console.log(`app listening on port 3000`)
-})
+
+module.exports = app;
