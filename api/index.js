@@ -444,7 +444,7 @@ app.post('/new-class',  verifyJWT, verifyInstructor,async (req, res) => {
     // Ensures that the client will close when you finish/error
   }
 }
-run().catch(console.dir);
+run();
 
 app.get('/test', (req, res) => {
     res.send('Testing route is working');
