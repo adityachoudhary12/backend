@@ -446,6 +446,10 @@ app.post('/new-class',  verifyJWT, verifyInstructor,async (req, res) => {
 }
 run().catch(console.dir);
 
+app.get('/test', (req, res) => {
+    res.send('Testing route is working');
+});
+
 app.get('/', async(req,res)=>{
     res.send("yoga class is running")
 })
