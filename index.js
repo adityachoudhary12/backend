@@ -447,7 +447,7 @@ app.post('/new-class',  verifyJWT, verifyInstructor,async (req, res) => {
 run().catch(console.dir);
 
 app.get('/', async(req,res)=>{
-    res.send("listening to port 00")
+    res.send("yoga class is running")
 })
 app.listen(port,()=>{
     console.log(`app listening on port 3000`)
