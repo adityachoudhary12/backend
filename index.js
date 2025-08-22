@@ -34,23 +34,32 @@ const client = new MongoClient(uri, {
 });
 
 let userCollection, classesCollection, cartCollection, enrolledCollection, paymentCollection, appliedCollection;
+let dbInitialized = false;
 
 async function connectDB() {
-    await client.connect();
-    const database = client.db("yoga-master");
-    userCollection = database.collection("users");
-    classesCollection = database.collection("classes");
-    cartCollection = database.collection("cart");
-    enrolledCollection = database.collection("enrolled");
-    paymentCollection = database.collection("payments");
-    appliedCollection = database.collection("applied");
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    if (!dbInitialized) {
+        await client.connect();
+        const database = client.db("yoga-master");
+        userCollection = database.collection("users");
+        classesCollection = database.collection("classes");
+        cartCollection = database.collection("cart");
+        enrolledCollection = database.collection("enrolled");
+        paymentCollection = database.collection("payments");
+        appliedCollection = database.collection("applied");
+        dbInitialized = true;
+    }
 }
-connectDB().catch(console.dir);
+
+// Helper to ensure DB is connected before each request
+async function ensureDB() {
+    if (!dbInitialized) {
+        await connectDB();
+    }
+}
 
 // Middleware for role verification
 const verifyAdmin = async (req, res, next) => {
+    await ensureDB();
     const email = req.decoded.email;
     const user = await userCollection.findOne({ email });
     if (user && user.role === 'admin') {
@@ -61,6 +70,7 @@ const verifyAdmin = async (req, res, next) => {
 };
 
 const verifyInstructor = async (req, res, next) => {
+    await ensureDB();
     const email = req.decoded.email;
     const user = await userCollection.findOne({ email });
     if (user && (user.role === 'instructor' || user.role === 'admin')) {
@@ -72,6 +82,7 @@ const verifyInstructor = async (req, res, next) => {
 
 // User routes
 app.post('/new-user', async (req, res) => {
+    await ensureDB();
     const newUser = req.body;
     const result = await userCollection.insertOne(newUser);
     res.send(result);
@@ -84,29 +95,34 @@ app.post('/api/set-token', (req, res) => {
 });
 
 app.get('/users', async (req, res) => {
+    await ensureDB();
     const users = await userCollection.find({}).toArray();
     res.send(users);
 });
 
 app.get('/users/:id', async (req, res) => {
+    await ensureDB();
     const id = req.params.id;
     const user = await userCollection.findOne({ _id: new ObjectId(id) });
     res.send(user);
 });
 
 app.get('/user/:email', verifyJWT, async (req, res) => {
+    await ensureDB();
     const email = req.params.email;
     const result = await userCollection.findOne({ email });
     res.send(result);
 });
 
 app.delete('/delete-user/:id', verifyJWT, verifyAdmin, async (req, res) => {
+    await ensureDB();
     const id = req.params.id;
     const result = await userCollection.deleteOne({ _id: new ObjectId(id) });
     res.send(result);
 });
 
 app.put('/update-user/:id', verifyJWT, verifyAdmin, async (req, res) => {
+    await ensureDB();
     const id = req.params.id;
     const updatedUser = req.body;
     const filter = { _id: new ObjectId(id) };
@@ -129,28 +145,33 @@ app.put('/update-user/:id', verifyJWT, verifyAdmin, async (req, res) => {
 
 // Class routes
 app.post('/new-class', verifyJWT, verifyInstructor, async (req, res) => {
+    await ensureDB();
     const newClass = req.body;
     const result = await classesCollection.insertOne(newClass);
     res.send(result);
 });
 
 app.get('/classes', async (req, res) => {
+    await ensureDB();
     const result = await classesCollection.find().toArray();
     res.send(result);
 });
 
 app.get('/classes/:email', verifyJWT, verifyInstructor, async (req, res) => {
+    await ensureDB();
     const email = req.params.email;
     const result = await classesCollection.find({ instructorEmail: email }).toArray();
     res.send(result);
 });
 
 app.get('/classes-manage', async (req, res) => {
+    await ensureDB();
     const result = await classesCollection.find().toArray();
     res.send(result);
 });
 
 app.patch('/change-status/:id', verifyJWT, verifyAdmin, async (req, res) => {
+    await ensureDB();
     const id = req.params.id;
     const status = req.body.status;
     const reason = req.body.reason;
@@ -167,17 +188,20 @@ app.patch('/change-status/:id', verifyJWT, verifyAdmin, async (req, res) => {
 });
 
 app.get('/approved-classes', async (req, res) => {
+    await ensureDB();
     const result = await classesCollection.find({ status: 'approved' }).toArray();
     res.send(result);
 });
 
 app.get('/class/:id', async (req, res) => {
+    await ensureDB();
     const id = req.params.id;
     const result = await classesCollection.findOne({ _id: new ObjectId(id) });
     res.send(result);
 });
 
 app.put('/update-class/:id', verifyJWT, verifyInstructor, async (req, res) => {
+    await ensureDB();
     const id = req.params.id;
     const updatedClass = req.body;
     const filter = { _id: new ObjectId(id) };
@@ -198,12 +222,14 @@ app.put('/update-class/:id', verifyJWT, verifyInstructor, async (req, res) => {
 
 // Cart routes
 app.post('/add-to-cart', verifyJWT, async (req, res) => {
+    await ensureDB();
     const newCartItem = req.body;
     const result = await cartCollection.insertOne(newCartItem);
     res.send(result);
 });
 
 app.get('/cart-item/:id', verifyJWT, async (req, res) => {
+    await ensureDB();
     const id = req.params.id;
     const email = req.query.email;
     const query = { classId: id, email: email };
@@ -213,6 +239,7 @@ app.get('/cart-item/:id', verifyJWT, async (req, res) => {
 });
 
 app.get('/cart/:email', verifyJWT, async (req, res) => {
+    await ensureDB();
     const email = req.params.email;
     const query = { userMail: email };
     const projection = { classId: 1 };
@@ -224,6 +251,7 @@ app.get('/cart/:email', verifyJWT, async (req, res) => {
 });
 
 app.delete('/delete-cart-item/:id', verifyJWT, async (req, res) => {
+    await ensureDB();
     const id = req.params.id;
     const query = { classId: id };
     const result = await cartCollection.deleteOne(query);
@@ -245,6 +273,7 @@ app.post('/create-payment-intent', verifyJWT, async (req, res) => {
 });
 
 app.post('/payment-info', verifyJWT, async (req, res) => {
+    await ensureDB();
     const paymentInfo = req.body;
     const classesId = paymentInfo.classesId;
     const userEmail = paymentInfo.userEmail;
@@ -276,6 +305,7 @@ app.post('/payment-info', verifyJWT, async (req, res) => {
 });
 
 app.get('/payment-history/:email', async (req, res) => {
+    await ensureDB();
     const email = req.params.email;
     const query = { userEmail: email };
     const result = await paymentCollection.find(query).sort({ date: -1 }).toArray();
@@ -283,6 +313,7 @@ app.get('/payment-history/:email', async (req, res) => {
 });
 
 app.get('/payment-history-length/:email', async (req, res) => {
+    await ensureDB();
     const email = req.params.email;
     const query = { userEmail: email };
     const total = await paymentCollection.countDocuments(query);
@@ -291,11 +322,13 @@ app.get('/payment-history-length/:email', async (req, res) => {
 
 // Enrollment routes
 app.get('/popular_classes', async (req, res) => {
+    await ensureDB();
     const result = await classesCollection.find().sort({ totalEnrolled: -1 }).limit(6).toArray();
     res.send(result);
 });
 
 app.get('/popular-instructors', async (req, res) => {
+    await ensureDB();
     const pipeline = [
         {
             $group: {
@@ -334,6 +367,7 @@ app.get('/popular-instructors', async (req, res) => {
 });
 
 app.get('/admin-stats', verifyJWT, verifyAdmin, async (req, res) => {
+    await ensureDB();
     const approvedClasses = (await classesCollection.find({ status: 'approved' }).toArray()).length;
     const pendingClasses = (await classesCollection.find({ status: 'pending' }).toArray()).length;
     const instructors = (await userCollection.find({ role: 'instructor' }).toArray()).length;
@@ -350,11 +384,13 @@ app.get('/admin-stats', verifyJWT, verifyAdmin, async (req, res) => {
 });
 
 app.get('/instructors', async (req, res) => {
+    await ensureDB();
     const result = await userCollection.find({ role: 'instructor' }).toArray();
     res.send(result);
 });
 
 app.get('/enrolled-classes/:email', verifyJWT, async (req, res) => {
+    await ensureDB();
     const email = req.params.email;
     const query = { userEmail: email };
     const pipeline = [
@@ -395,12 +431,14 @@ app.get('/enrolled-classes/:email', verifyJWT, async (req, res) => {
 });
 
 app.post('/as-instructor', async (req, res) => {
+    await ensureDB();
     const data = req.body;
     const result = await appliedCollection.insertOne(data);
     res.send(result);
 });
 
 app.get('/applied-instructors/:email', async (req, res) => {
+    await ensureDB();
     const email = req.params.email;
     const result = await appliedCollection.findOne({ email });
     res.send(result);
@@ -416,6 +454,3 @@ app.get('/', async (req, res) => {
 });
 
 module.exports = app;
-// app.listen(process.env.PORT || 5000, () => {
-//     console.log(`Yoga class server is running on port ${process.env.PORT || 5000}`);
-// });
