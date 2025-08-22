@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const cors = require('cors');
 require('dotenv').config()
 const stripe = require('stripe')(process.env.PAYMENT_SECRET);
-const port = process.env.PORT || 5000;
+const port = 3000;
 
 // Middleware
 app.use(cors());
@@ -450,5 +450,5 @@ app.get('/', async(req,res)=>{
     res.send("listening to port 00")
 })
 app.listen(port,()=>{
-    console.log(`app listening on port 5000`)
+    console.log(`app listening on port 3000`)
 })
